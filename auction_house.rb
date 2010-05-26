@@ -14,22 +14,31 @@ module WowArmory
 			attr_reader :db
 			
 			def initialize(yaml)
+				# Load configuration
 				@config = YAML::load(File.open(yaml).read)
+				
+				# Setup "browser"
 				@agent = Mechanize.new {|agent| agent.user_agent = "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.2.4) Gecko/20100513 Firefox/3.6.4" }
 				@agent.pre_connect_hooks << lambda { |params| params[:request]['Connection'] = 'keep-alive' }
 
+				# Setup database connection
 				@db = Mongo::Connection.new.db(@config["database"])
 				@db["auctions"].create_index("auc", :unique => true)
 				@db["auctions"].create_index([["n", Mongo::ASCENDING]])
 			end
 			
 			def login!
-				@agent.get(@config["root"]) do |page|
+				# Attempt authentication
+				
+				# Send a GET request to the default armory URL
+				@agent.get(@config["urlroot"]) do |page|
+					# Fill in the login form
 					login_result = page.form_with(:name => "loginForm") do |login|
 						login.accountName = @config["user"]
 						login.password = @config["pass"]
-					end.submit
+					end.submit # Submit the form
 					
+					# See if an authenticator is being requested
 					if login_result.forms.first.action.match("authenticator.html") then
 						@needs_auth = true
 						return false
@@ -40,16 +49,44 @@ module WowArmory
 			end
 			
 			def authenticate!(code)
+				# Fill in the authenticator form
 				result = @agent.current_page.form_with(:action => /authenticator/) do |auth|
 					auth.authValue = code
-				end.submit
+				end.submit # Submit the form
 			end
 			
 			def needs_authenticator?
 				!!@needs_auth
-			end		
+			end
+			
+			def get_character
+				# Open money.json
+				# Return result.command
+				# result.command.f, .cn, .r
+			end
+			
+			def get_money
+				# Open money.json
+				# Return result.money
+			end
+			
+			def set_character
+				pieces = {}
+				pieces["cn"] = "" # Character name
+				pieces["r"] = "" # Realm
+				
+				# Open changechar
+				# Return result.success
+			end
+			
+			def bid(auc, money, faction)
+				
+			end
 			
 			def search(query)
+				# Perform a query
+				
+				# Querystring parts
 				pieces = {}
 				pieces["n"] = CGI::escape(query["query"]) unless query["query"].blank?
 				pieces["qual"] = query["qual"] || 0
@@ -59,33 +96,52 @@ module WowArmory
 				start = 0
 				answers = []
 				totalCt = nil
+				sleepTime = @config["sleeptime"]
+				
+				# Keep querying until we hit a problem
 				while true do
+					# Add a parameter for the starting record for
+					# this query - automates paging to retrieve ALL
+					# results for a particular query
 					pieces["start"] = start
+					
+					# Break if we know the total number of results,
+					# and we have reached the end of the results
 					break if totalCt and start >= totalCt
-					url = sprintf(@config["query"], pieces.map {|k, v| "#{k}=#{v}"}.join("&"))
-					# puts url
+					
+					# Build the query URL
+					url = sprintf(@config["urlroot"] + @config["urlsearch"], pieces.map {|k, v| "#{k}=#{v}"}.join("&"))
+					
+					# Retrieve the result set
 					result = @agent.get(url)
-					startTime = Time.now.to_f
-
+					
+					# See if we have results
 					page = JSON::load(result.body)
 					if page["auctionSearch"].nil? then
 						puts "Hit throttle! Skipping request..."
 						next
 					end
+					
+					# Populate the total result number if not known
 					totalCt ||= page["auctionSearch"]["total"]
+					
+					# Increment our result page
 					start += 50
 					
+					# Break if we don't have any results
 					break if page["auctionSearch"]["auctions"].empty?
+					
+					# Add the results to our collection
 					answers += page["auctionSearch"]["auctions"]
-					endTime = Time.now.to_f
-					sleepTime = 0.55
+					
+					# Throttle requests
 					sleep(sleepTime)
 				end
 				return answers
 			end
 			
 			def get_price_data(group_by, query)
-				reduce = Mongo::Code.new <<-EOF
+				reduce = BSON::Code.new <<-EOF
 					function(obj, prev) {
 						var price = obj.ppuBuy
 						if(!price) price = obj.buy
@@ -96,7 +152,7 @@ module WowArmory
 						}
 					}
 				EOF
-				finalize = Mongo::Code.new <<-EOF
+				finalize = BSON::Code.new <<-EOF
 					function(out) {
 						var values = out.values
 						out.len = values.length

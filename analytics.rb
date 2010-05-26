@@ -50,6 +50,8 @@ end
 
 analytics = WowArmory::AuctionHouse::Analytics.new "auctionboss.yml"
 
+analytics.get_stats()
+
 nice = "%s: Moved %d lots (%d units), avg moving @ %s (%s min / %s max) [list @ %s, total %sg]"
 csv = "%s,%d,%d,%s,%s,%s,%s,%s"
 query = nil

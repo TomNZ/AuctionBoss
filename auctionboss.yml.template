@@ -1,5 +1,33 @@
+# Usage
+# Make a copy of this file, named auctionboss.yml
+# and modify as needed
+
+# The following fields you should probably modify
+
+# Login details
 user: your_username
 pass: your_password
-root: "http://www.wowarmory.com/auctionhouse/"
-query: "http://www.wowarmory.com/auctionhouse/search.json?sort=rarity&reverse=false&pageSize=50&rhtml=false&%s"
+
+# Character to use
+charname: char
+charrealm: realm
+# 0=Alliance, 1=Horde, 2=Neutral
+faction: 0
+
+# The following fields all have sensible defaults,
+# and should not need changing
+
+# URLs
+urlroot: "http://www.wowarmory.com/"
+urlsearch: "search.json?sort=rarity&reverse=false&pageSize=50&rhtml=false&%s"
+urlbid: "bid.json?%s"
+urldeposit: "auctionhouse/deposit.json?%s"
+urlcreate: "auctionhouse/create.json?%s"
+urlinventory: "auctionhouse/inventory.json"
+urlselectchar: "vault/character-select-submit.json?%s"
+urlmoney: "auctionhouse/money.json"
+
+# MongoDB database
 database: auctionboss
+# Time between requests
+sleeptime: 0.55

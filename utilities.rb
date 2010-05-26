@@ -1,3 +1,5 @@
+require 'win32console'
+
 module WowArmory
 	module AuctionHouse
 		module Utilities
